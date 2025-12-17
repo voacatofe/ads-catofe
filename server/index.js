@@ -78,6 +78,74 @@ app.post('/api/save', async (req, res) => {
     }
 });
 
+// POST /api/accounts/sync - Sync data from N8N (Upsert)
+app.post('/api/accounts/sync', async (req, res) => {
+    let accountsToProcess = [];
+
+    // 1. Check if body is directly an array
+    if (Array.isArray(req.body)) {
+        accountsToProcess = req.body;
+    }
+    // 2. Check if body has 'accounts' key which is an array
+    else if (req.body.accounts && Array.isArray(req.body.accounts)) {
+        accountsToProcess = req.body.accounts;
+    }
+    // 3. Fallback: Assume the body is a single account object
+    else if (req.body && typeof req.body === 'object') {
+        accountsToProcess = [req.body];
+    }
+
+    if (accountsToProcess.length === 0) {
+        return res.status(400).json({ error: 'Invalid input: No account data found' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Upsert query
+        const query = `
+            INSERT INTO ads_accounts (
+                account_id, name, account_status, business_name, 
+                balance, created_at, updated_at
+            ) VALUES (
+                $1, $2, $3, $4, 
+                $5, $6, $7
+            )
+            ON CONFLICT (account_id) DO UPDATE SET
+                name = EXCLUDED.name,
+                account_status = EXCLUDED.account_status,
+                business_name = EXCLUDED.business_name,
+                balance = EXCLUDED.balance,
+                updated_at = EXCLUDED.updated_at
+        `;
+
+        for (const acc of accountsToProcess) {
+            // Validate minimal required fields
+            if (!acc.account_id) continue;
+
+            await client.query(query, [
+                acc.account_id,
+                acc.name,
+                acc.account_status || 'UNKNOWN',
+                acc.business_name || '',
+                acc.balance || 0,
+                acc.created_at || new Date(),
+                new Date() // updated_at is now
+            ]);
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, count: accountsToProcess.length });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Failed to sync data', details: err.message });
+    } finally {
+        client.release();
+    }
+});
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
