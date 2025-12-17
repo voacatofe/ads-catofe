@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ads_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: X7z9#mK2$$LpQvN4r
+      POSTGRES_DB: ads_db
+    ports:
+      - "5488:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./server/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: always
+
+  server:
+    build: ./server
+    container_name: ads_server
+    environment:
+      - DB_CONNECTION_STRING=postgres://postgres:X7z9%23mK2%24LpQvN4r@postgres:5432/ads_db
+      - PORT=3000
+    ports:
+      - "3333:3000"
+    depends_on:
+      - postgres
+    restart: always
+
+  app:
+    build: ./ads-app
+    container_name: ads_app
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://server:3000
+    depends_on:
+      - server
+    restart: always
+
+volumes:
+  pgdata:
