@@ -5,8 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0', // Explicitly bind to 0.0.0.0
-    allowedHosts: ['all'], // Allow traffic from any host (fixes bad gateway on VPS)
+    host: '0.0.0.0',
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:3333',
