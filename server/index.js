@@ -23,19 +23,30 @@ pool.on('error', (err) => {
 // Routes
 
 // GET /api/accounts - Fetch all accounts
+// GET /api/accounts - Fetch all accounts (optional filter ?active=true)
 app.get('/api/accounts', async (req, res) => {
     try {
-        const result = await pool.query('SELECT * FROM ads_accounts ORDER BY name ASC');
-        // Map database columns to frontend expected format if needed, but we used same names mostly.
-        // Frontend expects: { id, name, accountId, status } + loaded from DB we have snake_case
-        // Let's return raw and adjust frontend or map here.
-        // Mapping for consistency with previous frontend code:
+        const { active } = req.query;
+        let query = 'SELECT * FROM ads_accounts';
+        const params = [];
+
+        if (active === 'true') {
+            query += ' WHERE ativo_catofe = TRUE';
+        }
+
+        query += ' ORDER BY name ASC';
+
+        const result = await pool.query(query, params);
+
         const mapped = result.rows.map(row => ({
             id: row.csv_id,
             name: row.name,
             accountId: row.account_id,
             status: row.account_status,
-            ativo_catofe: row.ativo_catofe
+            ativo_catofe: row.ativo_catofe,
+            // Include other useful fields for N8N
+            business_name: row.business_name,
+            balance: row.balance
         }));
         res.json(mapped);
     } catch (err) {
